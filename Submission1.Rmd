@@ -1,0 +1,180 @@
+---
+title: "Predicting Listening Time"
+author: "Eric Zarycki"
+date: "2025-04-10"
+output: html_document
+---
+
+```{r}
+library(sqldf)
+library(ggplot2)
+library(ggthemes)
+library(RColorBrewer)
+
+```
+
+
+```{r}
+test <- readr::read_csv("Data/test.csv")
+train <- readr::read_csv("Data/train.csv")
+```
+
+
+```{r}
+head(train)
+```
+
+```{r}
+summary(train)
+```
+Exploratory Data Analysis - Categorical Variables
+
+Which Podcasts appear the most in the Training Dataset the most?
+```{r}
+
+mostpoppods <- sqldf("
+  
+      SELECT Podcast_Name,
+      COUNT(*) as n
+      FROM train
+      GROUP BY Podcast_Name
+      ORDER BY 2 DESC
+      LIMIT 10
+      
+      ")
+
+ggplot(mostpoppods, aes(x = reorder(Podcast_Name, -n), y = n, fill = Podcast_Name)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = n), vjust = 2, size = 3.5) +
+  scale_fill_brewer(palette = "Set3") +  # Other good ones: "Paired", "Dark2", "Pastel1"
+  labs(title = "Top 10 Podcasts in Training Dataset by Frequency",
+       x = "Podcast Name", y = "Count") +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none")
+
+```
+What genre appears the most in the training dataset the most frequently?
+
+```{r}
+
+popgenre <- sqldf("
+      SELECT Genre,
+      COUNT(*) as n
+      FROM train
+      GROUP BY Genre
+      ORDER BY 2 DESC
+      ")
+
+ggplot(popgenre, aes(x = reorder(Genre, -n), y = n, fill = Genre)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = n), vjust = 2, size = 3.5) +
+  scale_fill_brewer(palette = "Set3") +  # Other good ones: "Paired", "Dark2", "Pastel1"
+  labs(title = "Most Frequent Genres in Training Dataset",
+       x = "Genre Name", y = "Count") +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none")
+
+
+
+```
+Distribution of Episode Title by Frequnecy (Top 10)
+
+```{r}
+popepisode <- sqldf("
+      SELECT Episode_Title,
+      COUNT(*) as n
+      FROM train
+      GROUP BY Episode_Title
+      ORDER BY n DESC
+      LIMIT 10
+      ")
+
+ggplot(popepisode, aes(x = reorder(Episode_Title, -n), y = n, fill = Episode_Title)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = n), vjust = 2, size = 3.5) +
+  scale_fill_brewer(palette = "Set3") +  # Other good ones: "Paired", "Dark2", "Pastel1"
+  labs(title = "Top 10 Episodes in Training Dataset by Frequency",
+       x = "Episode Title", y = "Count") +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none")
+```
+
+
+
+
+Day and Time
+```{r}
+popday <- sqldf("
+      SELECT Publication_Day,
+      Publication_Time,
+      COUNT(*) as n
+      FROM train
+      GROUP BY Publication_Day,
+      Publication_Time
+      ORDER BY n DESC
+      ")
+
+popday$Publication_Day <- factor(popday$Publication_Day, 
+                              levels = c("Sunday", "Monday", "Tuesday", "Wednesday", 
+                                         "Thursday", "Friday", "Saturday"))
+
+ggplot(popday, aes(x = Publication_Day, y = n, fill = Publication_Time)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = n), 
+            position = position_stack(vjust = 0.5), # Centers label within each segment
+            size = 3) +
+  labs(title = "Distribution by Day and Time of Podcast",
+       x = "Day", y = "Count") +
+  scale_fill_brewer(palette = "Set3") +  # You can change color palette here
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+Distribution of Sentiment 
+
+```{r}
+sent <- sqldf("
+      SELECT Episode_Sentiment,
+      COUNT(*) as n
+      FROM train
+      GROUP BY Episode_Sentiment
+      ")
+
+ggplot(sent, aes(x = Episode_Sentiment, y = n, fill = Episode_Sentiment)) +
+  geom_bar(stat = "identity") +
+    geom_text(aes(label = n), vjust = 2, size = 3.5) +
+  labs(title = "Sentiment by Frequency",
+       x = "Sentiment", y = "Count") +
+  scale_fill_manual(values = c("Positive" = "lightgreen", "Negative" = "red", "Neutral" = "gray")) +  # You can choose a different palette here
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+Numerical Variable Analysis
+
+Episode Length Minutes vs. Listening Time Minutes
+
+```{r}
+
+epwatched <- sqldf("
+      SELECT Episode_Length_minutes,
+      Listening_Time_minutes
+      FROM train
+      WHERE Episode_Length_minutes IS NOT NULL
+      ")
+
+ggplot(epwatched, aes(x = Episode_Length_minutes, y = Listening_Time_minutes)) +
+  geom_hex() +
+  scale_fill_viridis_c() +  # Color scale for density
+  labs(title = "Hexbin Plot: Episode Length vs Listening Time",
+       x = "Episode Length (Minutes)", y = "Listening Time (Minutes)") +
+  theme_minimal(base_size = 12)
+
+```
+
+
+
+
+
