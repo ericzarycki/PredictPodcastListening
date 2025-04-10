@@ -6,10 +6,19 @@ output: html_document
 ---
 
 ```{r}
-library(sqldf)
+# Visualization Packages
 library(ggplot2)
 library(ggthemes)
 library(RColorBrewer)
+
+# Predictive Packages
+library(tidymodels)
+library(textrecipes)
+library(glmnet)
+
+# Other
+library(dplyr)
+library(sqldf)
 
 ```
 
@@ -174,7 +183,64 @@ ggplot(epwatched, aes(x = Episode_Length_minutes, y = Listening_Time_minutes)) +
 
 ```
 
+## Building the Model
+
+```{r}
+set.seed(123)
+
+# Sample and split
+train_sample <- train %>% slice_sample(n=100000)
+
+train_split <- train_sample %>% initial_split(strata = Listening_Time_minutes)
+
+ltm_train <- training(train_split)
+ltm_test <- testing(train_split)
+
+set.seed(456)
+ltm_folds <- vfold_cv(ltm_train, strata = Listening_Time_minutes)
+ltm_folds
+
+```
+
+## Preprocessing
+
+```{r}
+ltm_recipe <- ltm_train %>% recipe(Listening_Time_minutes ~.) %>% 
+  step_rm(id, Podcast_Name, Episode_Title, Number_of_Ads, Publication_Day, Publication_Time) %>% 
+  step_naomit(all_predictors()) %>% 
+  step_normalize(all_numeric_predictors()) %>% 
+  step_dummy(all_nominal_predictors())
+  
+```
+
+## Specifications
+
+```{r}
+
+linear_spec <-
+  linear_reg() %>% set_mode("regression") %>%
+  set_engine("glmnet")
+  
+
+```
+
+## Workflow
+
+```{r}
+linear_wf <- workflow(ltm_recipe,linear_spec)
+```
+
+## Evaluate models
+
+```{r}
+#doParallel::registerDoParallel()
+contrl_preds <- control_resamples(save_pred = TRUE)
+
+linear_rs <- fit_resamples(linear_wf,
+                           resamples = ltm_folds,
+                           control=contrl_preds)
 
 
+```
 
 
