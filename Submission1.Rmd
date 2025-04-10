@@ -15,6 +15,7 @@ library(RColorBrewer)
 library(tidymodels)
 library(textrecipes)
 library(glmnet)
+library(imputeTS)
 
 # Other
 library(dplyr)
@@ -218,7 +219,7 @@ ltm_recipe <- ltm_train %>% recipe(Listening_Time_minutes ~.) %>%
 ```{r}
 
 linear_spec <-
-  linear_reg() %>% set_mode("regression") %>%
+  linear_reg(penalty = 0.1, mixture = 1) %>% set_mode("regression") %>%
   set_engine("glmnet")
   
 
@@ -240,7 +241,45 @@ linear_rs <- fit_resamples(linear_wf,
                            resamples = ltm_folds,
                            control=contrl_preds)
 
+```
+
+## Results
+```{r}
+collect_metrics(linear_rs)
+```
+
+## Final Fit
+```{r}
+final_fitted <- last_fit(linear_wf,train_split)
+```
+
+## Fitted Worokflow for prediction
+```{r}
+final_wf <- extract_workflow(final_fitted)
+```
+
+
+## Submission
+```{r}
+final_prediction <- predict(final_wf, new_data = test)
+
+submission <- test %>% select(id) %>% bind_cols(round(final_prediction,3))
+
+colnames(submission) <- c("id", "Listening_Time_minutes")
+
+submission$Listening_Time_minutes <- submission$Listening_Time_minutes %>% 
+  na_interpolation("linear")
 
 ```
+
+##Result
+```{r}
+submission %>% 
+  write_csv("submission.csv")
+```
+
+
+
+
 
 
