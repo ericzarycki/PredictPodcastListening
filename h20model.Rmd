@@ -1,0 +1,72 @@
+---
+title: "h20model"
+author: "Eric Zarycki"
+date: "2025-04-11"
+output: html_document
+---
+
+```{r}
+library(h2o)
+
+
+h2o.init(nthreads = -1)
+```
+##Pre processing
+
+```{r}
+ltm_prep <- prep(ltm_recipe)
+
+baked_train_ltm <- bake(ltm_prep,new_data=train_sample)
+baked_test_ltm <- bake(ltm_prep,new_data=test)
+
+y="Listening_Time_minutes"
+x= setdiff(names(baked_train_ltm),y)
+```
+##Model
+```{r}
+
+h2o_automl_models <- h2o.automl(
+    x = x,
+    y = y,
+    training_frame   = as.h2o(baked_train_ltm),
+    nfolds           = 10,
+    include_algos = c("GLM"),
+    stopping_metric = "RMSE",
+    sort_metric = "RMSE",
+    max_runtime_secs = 7200
+)
+```
+## Leaderboard
+```{r}
+lb <- h2o.get_leaderboard(object = h2o_automl_models, extra_columns = "ALL")
+print(lb)
+```
+## Predict Using the Best Model
+```{r}
+predictions <- h2o.predict(h2o_automl_models@leader,newdata=as.h2o(baked_test_ltm))
+```
+
+## Join Column Id with predicted price and change column name to SalePrice
+```{r}
+predictions_tbl <- predictions %>% 
+    as_tibble() %>% 
+    mutate(id = test$id) %>% 
+    rename(Listening_Time_minutes = predict) %>% 
+    select(id,Listening_Time_minutes)
+```
+
+## Find RMSE
+```{r}
+performance_h2o <- h2o.performance(h2o_automl_models@leader, 
+                                   newdata = as.h2o(baked_test_ltm %>% 
+                                                        mutate(Listening_Time_minutes = predictions_tbl$Listening_Time_minutes)))
+performance_h2o@metrics$RMSE
+```
+## Output to CSV
+```{r}
+predictions_tbl %>% 
+    write_csv("h20_submission.csv") 
+```
+
+
+

@@ -3,6 +3,8 @@ title: "Predicting Listening Time"
 author: "Eric Zarycki"
 date: "2025-04-10"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r}
@@ -219,7 +221,7 @@ ltm_recipe <- ltm_train %>% recipe(Listening_Time_minutes ~.) %>%
 ```{r}
 
 linear_spec <-
-  linear_reg(penalty = 0.1, mixture = 1) %>% set_mode("regression") %>%
+  linear_reg(penalty = 0.256, mixture = 0.781) %>% set_mode("regression") %>%
   set_engine("glmnet")
   
 
@@ -230,6 +232,25 @@ linear_spec <-
 ```{r}
 linear_wf <- workflow(ltm_recipe,linear_spec)
 ```
+
+## Grid
+```{r}
+grid_vals <- grid_random(
+  penalty(),
+  mixture(),
+  size = 20  # random 20 combinations
+)
+
+tune_results <- tune_grid(
+  linear_wf,
+  resamples = ltm_folds,  # your cross-validation folds
+  grid = grid_vals,
+  control = control_grid(save_pred = TRUE)
+)
+
+autoplot(tune_results)
+```
+
 
 ## Evaluate models
 
@@ -275,7 +296,7 @@ submission$Listening_Time_minutes <- submission$Listening_Time_minutes %>%
 ##Result
 ```{r}
 submission %>% 
-  write_csv("submission.csv")
+  write_csv("submission2.csv")
 ```
 
 
